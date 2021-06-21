@@ -46,7 +46,9 @@
     <el-table
       :data="tableData"
       stripe
-      height="200px"
+      size="mini"
+      height="400"
+      max-height="400"
       style="width: 100%">    
       <el-table-column
         prop="id"
