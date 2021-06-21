@@ -1,53 +1,78 @@
 <template>
   <div class="hello">
     <h1>Employee Dashboard</h1>
-    <div>
-      <input type="file" id="myFile" name="filename" accept=".csv" v-on:change="onFilePicked">
-      <button v-on:click="submitEmployeeData">Submit</button>
+    <el-divider class="divider">Upload Employee Records</el-divider>
+    <div class="upload-section">
+      <el-upload
+        action="action"
+        :file-list="files"
+        :http-request="handleUpload"
+        :on-change="onFilePicked"
+        :on-remove="onFileRemoved"
+        accept=".csv"
+        class="upload-handler"
+      >
+        <el-button size="small" type="info" icon="el-icon-upload">
+          Click to upload
+        </el-button>
+      </el-upload>
+      <el-button size="small" type="primary" round plain @click="submitEmployeeData">Submit</el-button>
     </div>
+    <el-divider class="divider">Choose Salary Range (min - max)</el-divider>
     <div>
       <div class="min-max-holder">
-        <el-input id="maxSalary" placeholder="Maximum salary" v-model="maxSalary" size="small"></el-input>
-        <el-input id="minSalary" placeholder="Minimum salary" v-model="minSalary" size="small"></el-input>
+        <el-slider id="salary" v-model="salaryRange" range :step="100" :min="0" :max="10000" show-tooltip :marks="salaryMarks"></el-slider>
       </div>
-      <label for="sortBy">Sort by:</label>
-      <select id="sortBy" name="parmeters" v-model="sortBy">
-        <option value="id">ID</option>
-        <option value="login">Login</option>
-        <option value="name">Name</option>
-        <option value="salary">Salary</option>
-      </select>
-      <input type="submit" value="Search" v-on:click="searchForEmployees">
+      
     </div>
+
+    <el-divider class="divider">Choose Sorting Options</el-divider>
+    <div>
+      <el-select v-model="sortBy" placeholder="Select Sorting By">
+        <el-option
+          v-for="item in sortByOptions"
+          :key="item.value"
+          :label="item.label"
+          :value="item.value"
+        ></el-option>
+      </el-select>
+      <el-switch class="sort-switch" v-model="sortDirection" active-text="Ascending" inactive-text="Descending"></el-switch>
+    </div>
+    <div class="button-holder">
+      <el-button type="primary" v-on:click="searchForEmployees" round size="small">Search</el-button>
+    </div>
+
+    <el-divider class="divider">Search Employee Records</el-divider>
+    <el-table
+      :data="tableData"
+      stripe
+      height="200px"
+      style="width: 100%">    
+      <el-table-column
+        prop="id"
+        label="ID">
+      </el-table-column>
+      <el-table-column
+        prop="login"
+        label="Login"
+        width="180">
+      </el-table-column>
+      <el-table-column
+        prop="name"
+        label="Name"
+        width="180">
+      </el-table-column>
+      <el-table-column
+        prop="salary"
+        label="Salary">
+      </el-table-column>
+    </el-table>
     <el-pagination
         layout="prev, pager, next"
-        :total="50"
+        :page-count="pageCount"
         v-model:current-page="currentPage"
-        v-on:current-change="printCurrentPage">
+        v-on:current-change="searchForEmployees">
     </el-pagination>
-    <el-table
-    :data="tableData"
-    stripe
-    style="width: 100%">    
-    <el-table-column
-      prop="id"
-      label="ID">
-    </el-table-column>
-    <el-table-column
-      prop="login"
-      label="Login"
-      width="180">
-    </el-table-column>
-    <el-table-column
-      prop="name"
-      label="Name"
-      width="180">
-    </el-table-column>
-    <el-table-column
-      prop="salary"
-      label="Salary">
-    </el-table-column>
-  </el-table>
   </div>
 </template>
 
@@ -59,18 +84,24 @@ export default {
     msg: String
   },
   methods:{
-    onFilePicked: function(event){
-      console.log("Submitted file");
-      const files = event.target.files;
-      let filename = files[0].name;
-      console.log(filename);
-      this.employeeData = files[0];
+    handleUpload: function() {
+      console.log("uploaded file")
     },
-
-    submitEmployeeData: () => {
-      console.log("Uploading file");
+    onFilePicked: function(file, fileList){
+      this.files = fileList.slice(1);
+      let filename = file.name;
+      console.log(filename);
+      this.employeeData = file.raw;
+    },
+    onFileRemoved: function(file, fileList) {
+      this.files = fileList;
+      this.employeeData = null;
+    },
+    submitEmployeeData() {
+      console.log("Submitting file");
       if (this.employeeData != null){
         console.log("file detected");
+        console.log(this.employeeData)
         var bodyFormData = new FormData();
         bodyFormData.append('file', this.employeeData);
         // this.employeeData 
@@ -81,7 +112,9 @@ export default {
           method: 'post',
           url: 'http://localhost:5000/users/upload',
           data: bodyFormData,
-          headers: { "Content-Type": "multipart/form-data"},//"Access-Control-Allow-Origin": "*" 
+          headers: { 
+            "Content-Type": "multipart/form-data", 
+          },//"Access-Control-Allow-Origin": "*" 
         }).then(function (response) {
           //handle success
           console.log(response.data);
@@ -91,20 +124,26 @@ export default {
           console.log(error.response);
           this.$message.error(error.response.data.description);
         });
-        
-      }else{
-        this.$message.message("Please attach a CSV file");
+      }
+      else {
+        this.$message.error("Please attach a CSV file");
       }
     },
     searchForEmployees: function(){
+      var backEndSortOperator;
+      if (this.sortDirection){
+        backEndSortOperator = "%2b";
+      }else{
+        backEndSortOperator = "%2d";
+      }
       this.axios({
         method: 'get',
         url: 'http://localhost:5000/users?' 
-          + 'maxSalary=' + this.maxSalary
-          + '&minSalary=' + this.minSalary
+          + 'maxSalary=' + this.salaryRange[1]
+          + '&minSalary=' + this.salaryRange[0]
           + '&offset=' + ((this.currentPage - 1) * 30)
           + '&limit=' + 30
-          + '&sort=' + "%2b" + this.sortBy
+          + '&sort=' + backEndSortOperator + this.sortBy
       }).then( response => {
         this.tableData = [];
         var users = response.data.data.results;
@@ -123,11 +162,24 @@ export default {
   data () {
     return {
       employeeData: null,
-      maxSalary: 0,
-      minSalary: 0,
-      sortBy: null,
+      salaryRange: [0, 10000],
+      salaryMarks: {
+        0: "0",
+        1000: "1000",
+        5000: "5000",
+        10000: "10000",
+      },
+      pageCount: 10,
+      sortByOptions: [
+        {value: 'salary', label: 'Salary'},
+        {value: 'name', label: 'Name'},
+        {value: 'login', label: 'Login'}
+      ],
+      sortDirection: true,
+      sortBy: "salary",
       currentPage: 1,
-      tableData: []
+      tableData: [],
+      files: [],
     }
   }
 }
@@ -151,7 +203,26 @@ a {
 }
 
 .min-max-holder {
-  display: flex;
-  justify-content: space-evenly;
+  text-align: left;
+  padding: 0px 40px;
+  margin-bottom: 30px;
 }
+
+.upload-handler {
+  margin-bottom: 10px;
+}
+
+.upload-section {
+  margin-bottom: 20px;
+  color: #3b3b3b;
+}
+
+.sort-switch {
+  margin-left: 15px;
+}
+
+.button-holder {
+  margin-top: 20px;
+}
+
 </style>
